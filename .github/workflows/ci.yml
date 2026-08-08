@@ -21,6 +21,9 @@ jobs:
           extensions: dom, mbstring
           coverage: none
 
+      - name: Configure Composer GitHub auth
+        run: composer config --global github-oauth.github.com ${{ secrets.FISSIBLE_PAT }}
+
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress
 
