@@ -1,4 +1,4 @@
-# Contributing to Transmark
+# Contributing to transmark-pdf
 
 ## Commit messages — Conventional Commits
 
@@ -29,8 +29,8 @@ All commits must follow [Conventional Commits](https://www.conventionalcommits.o
 ### Examples
 
 ```
-feat: resolve multi-level legal outline numbering in NumberingEngine
-fix: correct restart-after-ilvl handling for overridden levels
+feat: add page-margin option to PdfWriter
+fix: correct MediaBox dimensions for legal paper size
 docs: add DocxReader usage example to README
 chore: release v0.2.0
 ```
@@ -65,20 +65,14 @@ composer cs          # vendor/bin/php-cs-fixer fix --dry-run --diff
 
 A PR without tests for new behaviour will not be merged.
 
-## Design invariants
+## Scope
 
-These are load-bearing decisions, not style preferences — see `PROJECT.md` for the
-full rationale. Changes to them need a design discussion first, not just a PR:
-
-- The canonical numbering model is flat: a numbered `Paragraph` carries a
-  `NumberingRef{numId, ilvl}` pointer into `Document::numbering()`. It does not
-  live inside a nested list container.
-- Computed labels ("1.1.3", "(a)") live only in a `NumberingLabelMap` returned by
-  `NumberingEngine::resolve()` — never stored on the tree.
-- Legal outline paragraphs (`1.`, `7.1`, `(a)`) are `Paragraph` nodes, not `Heading`.
-- Byte-for-byte round-tripping is not a goal. Semantic idempotence
-  (`AST -> format -> AST` yields an equivalent tree) is the target, and should be
-  covered by the round-trip test harness as readers/writers land.
+This package is a thin composition layer: `PdfWriter` runs `fissible/transmark`'s
+`HtmlWriter::write()` to get HTML, then feeds that HTML through `dompdf/dompdf`
+(`loadHtml()` → `setPaper()` → `render()` → `output()`). It does not implement any
+document-model or numbering logic of its own — that lives upstream in
+`fissible/transmark`. Changes here should stay within that adapter role; new
+document-model concepts belong in `fissible/transmark`, not this repo.
 
 ---
 

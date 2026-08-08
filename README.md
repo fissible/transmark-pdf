@@ -41,6 +41,10 @@ $writer = new PdfWriter(paperSize: 'A4', paperOrientation: 'landscape');
 
 Accepts any paper size/orientation string [dompdf's `setPaper()`](https://github.com/dompdf/dompdf/wiki/Usage) supports.
 
+> **Note:** `PdfWriter` does not validate `paperSize`/`paperOrientation`. An invalid value
+> (e.g. `paperSize: 'not-a-size'`) does not throw — dompdf silently falls back to
+> letter/portrait. Pass values dompdf recognizes.
+
 ## License
 
 MIT
