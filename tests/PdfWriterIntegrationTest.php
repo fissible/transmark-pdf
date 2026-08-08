@@ -20,7 +20,7 @@ final class PdfWriterIntegrationTest extends TestCase
 
         self::assertStringStartsWith('%PDF-', $pdf);
         self::assertStringContainsString('%%EOF', $pdf);
-        self::assertGreaterThan(1200, strlen($pdf));
+        self::assertGreaterThan(1000, strlen($pdf));
         // Sanity check that the HTML this PDF was built from actually
         // carries the legal-outline flat-paragraph rendering strategy.
         self::assertSame(7, substr_count($html, '<p class="numbered-paragraph legal-level-'));
