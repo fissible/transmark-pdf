@@ -1,0 +1,39 @@
+{
+    "name": "fissible/transmark-pdf",
+    "description": "PDF export for fissible/transmark: PdfWriter composes HtmlWriter output with dompdf/dompdf.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["docx", "pdf", "converter", "transmark", "dompdf"],
+    "homepage": "https://github.com/fissible/transmark-pdf",
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "git@github.com:fissible/transmark.git"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "fissible/transmark": "^0.3",
+        "dompdf/dompdf": "^3.1"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.0",
+        "friendsofphp/php-cs-fixer": "^3.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Fissible\\Transmark\\Pdf\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Fissible\\Transmark\\Pdf\\Tests\\": "tests/"
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "scripts": {
+        "test": "phpunit",
+        "cs": "php-cs-fixer fix --dry-run --diff"
+    }
+}
