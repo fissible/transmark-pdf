@@ -34,5 +34,5 @@ jobs:
         run: vendor/bin/phpunit
 
       - name: Check code style
-        if: matrix.php == '8.4'
+        if: matrix.php == '8.2'
         run: vendor/bin/php-cs-fixer fix --dry-run --diff
