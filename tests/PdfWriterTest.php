@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Fissible\Transmark\Pdf\Tests;
 
-use Fissible\Transmark\Contracts\WriterInterface;
 use Dompdf\Options;
+use Fissible\Transmark\Contracts\WriterInterface;
 use Fissible\Transmark\Document;
 use Fissible\Transmark\Nodes\Block\Paragraph;
 use Fissible\Transmark\Nodes\Inline\Text;
