@@ -8,6 +8,7 @@ use Fissible\Transmark\Pdf\PdfWriter;
 use Fissible\Transmark\Readers\DocxReader;
 use Fissible\Transmark\Writers\HtmlWriter;
 use PHPUnit\Framework\TestCase;
+use Smalot\PdfParser\Parser;
 
 final class PdfWriterIntegrationTest extends TestCase
 {
@@ -20,7 +21,9 @@ final class PdfWriterIntegrationTest extends TestCase
 
         self::assertStringStartsWith('%PDF-', $pdf);
         self::assertStringContainsString('%%EOF', $pdf);
-        self::assertGreaterThan(1000, strlen($pdf));
+        $text = (new Parser())->parseContent($pdf)->getText();
+        self::assertStringContainsString('Definitions', $text);
+        self::assertStringContainsString('Termination', $text);
         // Sanity check that the HTML this PDF was built from actually
         // carries the legal-outline flat-paragraph rendering strategy.
         self::assertSame(7, substr_count($html, '<p class="numbered-paragraph legal-level-'));

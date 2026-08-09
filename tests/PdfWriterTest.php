@@ -11,6 +11,7 @@ use Fissible\Transmark\Nodes\Block\Paragraph;
 use Fissible\Transmark\Nodes\Inline\Text;
 use Fissible\Transmark\Pdf\PdfWriter;
 use PHPUnit\Framework\TestCase;
+use Smalot\PdfParser\Parser;
 
 final class PdfWriterTest extends TestCase
 {
@@ -29,7 +30,7 @@ final class PdfWriterTest extends TestCase
 
         self::assertStringStartsWith('%PDF-', $pdf);
         self::assertStringContainsString('%%EOF', $pdf);
-        self::assertGreaterThan(1000, strlen($pdf));
+        self::assertStringContainsString('Hello World', (new Parser())->parseContent($pdf)->getText());
     }
 
     public function test_write_accepts_an_empty_document_without_throwing(): void
