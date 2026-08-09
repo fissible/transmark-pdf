@@ -48,15 +48,24 @@ $pdfBytes = (new PdfWriter(options: $options))->write($document);
 
 ### PDF → Document reader
 
-`PdfReader` is a best-effort PDF reader that recovers a canonical `Document` from PDF bytes using layout heuristics.
+`PdfReader` is a best-effort PDF reader that recovers a canonical `Document` from PDF bytes using layout heuristics. It throws `Fissible\Transmark\Pdf\Exception\PdfParseException` when the content isn't readable at all — no extractable text (e.g. a scanned/image-only PDF), or content the underlying parser rejects as corrupt — rather than silently returning an empty or partial `Document`.
 
 Limitations to treat as accepted by design:
 - Headings and paragraph boundaries are inferred from font-size and spacing, not guaranteed
   from semantic document structure.
 - Inline emphasis/bold and table reconstruction are not recovered.
-- Unordered lists are currently returned as plain paragraph text runs (a follow-on limitation of
-  `smalot/pdfparser`'s text-run model in the real PDFs we validated against).
+- Consecutive unordered-list items merge into a single run-on paragraph rather than staying
+  separate list items — dompdf (and most PDF generators) render bullet markers as vector
+  shapes, not text, so there is no signal distinguishing a new bullet item from a wrapped
+  continuation line of the same paragraph. Ordered (numbered) lists are recovered correctly,
+  since numeric markers do render as real text.
 - Legal-outline `NumberingRef` structures do not round-trip through PDF text extraction.
+- Multi-column layouts are not supported — text is read in per-page top-to-bottom, then
+  left-to-right order, which interleaves columns incorrectly.
+- Non-Latin/non-Latin-1 text (e.g. CJK) does not survive a `PdfWriter` → `PdfReader` round
+  trip today — this is a `dompdf`/`PdfWriter` default-font limitation (no CJK glyphs
+  embedded), not a `PdfReader` defect; text that never rendered correctly in the PDF can't be
+  read back correctly either.
 
 ### Paper size and orientation
 

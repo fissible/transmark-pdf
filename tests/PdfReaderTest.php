@@ -201,4 +201,135 @@ final class PdfReaderTest extends TestCase
 
         self::assertNull($paragraph->numbering());
     }
+
+    public function test_paragraphs_do_not_merge_across_a_page_boundary(): void
+    {
+        $blocks = [];
+        for ($i = 1; $i <= 60; $i++) {
+            $blocks[] = new Paragraph([new Text(
+                "Paragraph number {$i} with some extra words to take up space than any other.",
+            )]);
+        }
+        $pdf = (new PdfWriter())->write(new Document($blocks));
+
+        $content = (new PdfReader())->read($pdf)->content();
+
+        self::assertCount(60, $content, 'A paragraph was lost or merged across a page boundary.');
+        foreach ($content as $index => $block) {
+            $expected = 'Paragraph number '.($index + 1).' with some extra words to take up space than any other.';
+            self::assertSame($expected, $block->inlines()[0]->content());
+        }
+    }
+
+    public function test_a_wrapped_ordered_list_item_recovers_as_a_single_unfragmented_item(): void
+    {
+        $longItemText = 'First item which is quite long so that it wraps onto more than one '
+            .'rendered line in the output PDF because it keeps going and going.';
+        $original = new Document([
+            new ListNode(ListNode::TYPE_ORDERED, [
+                new ListItem([new Paragraph([new Text($longItemText)])]),
+                new ListItem([new Paragraph([new Text('Second item which is short.')])]),
+            ]),
+        ]);
+        $pdf = (new PdfWriter())->write($original);
+
+        $content = (new PdfReader())->read($pdf)->content();
+
+        self::assertCount(1, $content, 'A list item wrapped onto a second line and fragmented into a stray paragraph.');
+        self::assertInstanceOf(ListNode::class, $content[0]);
+
+        $items = $content[0]->items();
+        self::assertCount(2, $items);
+        self::assertSame($longItemText, $items[0]->content()[0]->inlines()[0]->content());
+        self::assertSame('Second item which is short.', $items[1]->content()[0]->inlines()[0]->content());
+    }
+
+    public function test_an_ordered_list_item_with_inline_formatting_recovers_full_text(): void
+    {
+        $original = new Document([
+            new ListNode(ListNode::TYPE_ORDERED, [
+                new ListItem([new Paragraph([
+                    new Text('Pay the '),
+                    new Strong([new Text('full')]),
+                    new Text(' amount.'),
+                ])]),
+                new ListItem([new Paragraph([new Text('Second plain item.')])]),
+            ]),
+        ]);
+        $pdf = (new PdfWriter())->write($original);
+
+        $content = (new PdfReader())->read($pdf)->content();
+
+        self::assertCount(1, $content, 'A list item with inline formatting was truncated and split into a stray paragraph.');
+        self::assertInstanceOf(ListNode::class, $content[0]);
+
+        $items = $content[0]->items();
+        self::assertCount(2, $items);
+        self::assertSame('Pay the full amount.', $items[0]->content()[0]->inlines()[0]->content());
+        self::assertSame('Second plain item.', $items[1]->content()[0]->inlines()[0]->content());
+    }
+
+    public function test_inline_formatting_mid_paragraph_does_not_introduce_double_spaces(): void
+    {
+        $original = new Document([
+            new Paragraph([
+                new Text('This is '),
+                new Strong([new Text('bold')]),
+                new Text(' text after.'),
+            ]),
+        ]);
+        $pdf = (new PdfWriter())->write($original);
+
+        $content = (new PdfReader())->read($pdf)->content();
+
+        self::assertSame('This is bold text after.', $content[0]->inlines()[0]->content());
+    }
+
+    public function test_headings_are_still_classified_correctly_when_they_outnumber_body_text(): void
+    {
+        $original = new Document([
+            new Heading(1, [new Text('Heading Alpha')]),
+            new Heading(1, [new Text('Heading Beta')]),
+            new Heading(1, [new Text('Heading Gamma')]),
+            new Paragraph([new Text('Lonely body paragraph.')]),
+        ]);
+        $pdf = (new PdfWriter())->write($original);
+
+        $content = (new PdfReader())->read($pdf)->content();
+
+        self::assertInstanceOf(Heading::class, $content[0]);
+        self::assertInstanceOf(Heading::class, $content[1]);
+        self::assertInstanceOf(Heading::class, $content[2]);
+        self::assertInstanceOf(Paragraph::class, $content[3]);
+        self::assertSame('Lonely body paragraph.', $content[3]->inlines()[0]->content());
+    }
+
+    public function test_throws_a_pdf_parse_exception_not_a_third_party_exception_when_pages_cannot_be_read(): void
+    {
+        // Valid enough for Parser::parseContent() to succeed (real xref,
+        // real trailer), but /Root points at an object that is not a
+        // Catalog/Pages object at all, so Smalot\PdfParser\Document::getPages()
+        // throws its own Smalot\PdfParser\Exception\MissingCatalogException.
+        // That must never leak past this reader's own public API.
+        $pdf = $this->missingCatalogPdf();
+
+        $this->expectException(PdfParseException::class);
+
+        (new PdfReader())->read($pdf);
+    }
+
+    private function missingCatalogPdf(): string
+    {
+        $header = "%PDF-1.4\n";
+        $object = "1 0 obj\n<< /Type /Font /Subtype /Type1 >>\nendobj\n";
+        $objectOffset = strlen($header);
+
+        $body = $header.$object;
+        $xrefOffset = strlen($body);
+
+        $xref = "xref\n0 2\n0000000000 65535 f \n".sprintf('%010d', $objectOffset)." 00000 n \n";
+        $trailer = "trailer\n<< /Size 2 /Root 1 0 R >>\nstartxref\n".$xrefOffset."\n%%EOF";
+
+        return $body.$xref.$trailer;
+    }
 }

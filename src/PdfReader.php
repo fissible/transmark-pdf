@@ -24,14 +24,13 @@ final class PdfReader implements ReaderInterface
 
         try {
             $pdf = (new Parser([], $config))->parseContent($content);
+            $entries = $this->collectEntries($pdf);
         } catch (\Throwable $exception) {
             throw new PdfParseException(
                 'Unable to parse PDF content: '.$exception->getMessage(),
                 previous: $exception,
             );
         }
-
-        $entries = $this->collectEntries($pdf);
 
         if ($entries === []) {
             throw new PdfParseException(
@@ -70,13 +69,13 @@ final class PdfReader implements ReaderInterface
     }
 
     /**
-     * @return array<int, array{x: float, y: float, fontSize: float, text: string}>
+     * @return array<int, array{page: int, x: float, y: float, fontSize: float, text: string}>
      */
     private function collectEntries(\Smalot\PdfParser\Document $pdf): array
     {
         $entries = [];
 
-        foreach ($pdf->getPages() as $page) {
+        foreach ($pdf->getPages() as $pageNumber => $page) {
             $pageEntries = [];
 
             foreach ($page->getDataTm() as $item) {
@@ -87,6 +86,7 @@ final class PdfReader implements ReaderInterface
                 }
 
                 $pageEntries[] = [
+                    'page' => (int) $pageNumber,
                     'x' => (float) $tm[4],
                     'y' => (float) $tm[5],
                     'fontSize' => (float) $fontSize,
@@ -104,21 +104,43 @@ final class PdfReader implements ReaderInterface
         return $entries;
     }
 
+    /**
+     * The baseline is the font size with the most total character weight
+     * (not run count - a handful of short headings can otherwise outnumber
+     * one long body paragraph), smallest size wins ties. When that
+     * char-weighted candidate is itself much larger than the smallest font
+     * size present, it's more likely to be a title/heading-heavy document
+     * than genuine body text, so fall back to the smallest size - real body
+     * text is essentially never dramatically larger than the smallest text
+     * on the page (occasional smaller footnotes/page numbers aside, which
+     * char-weighting already discounts as a minority of the total text).
+     */
     private function baselineFontSize(array $entries): float
     {
-        $counts = [];
+        $charCounts = [];
+        $smallest = null;
+
         foreach ($entries as $entry) {
-            $key = number_format($entry['fontSize'], 2);
-            $counts[$key] = ($counts[$key] ?? 0) + 1;
+            $key = number_format($entry['fontSize'], 2, '.', '');
+            $charCounts[$key] = ($charCounts[$key] ?? 0) + mb_strlen($entry['text']);
+
+            if ($smallest === null || $entry['fontSize'] < $smallest) {
+                $smallest = $entry['fontSize'];
+            }
         }
 
-        $maxCount = max($counts);
+        $maxCount = max($charCounts);
         $candidates = array_map(
             static fn (string $key): float => (float) $key,
-            array_keys($counts, $maxCount, true),
+            array_keys($charCounts, $maxCount, true),
         );
+        $candidate = min($candidates);
 
-        return min($candidates);
+        if ($smallest !== null && $smallest > 0.0 && $candidate / $smallest >= 1.4) {
+            return $smallest;
+        }
+
+        return $candidate;
     }
 
     private function tierFor(float $fontSize, float $baseline): int
@@ -138,7 +160,7 @@ final class PdfReader implements ReaderInterface
     }
 
     /**
-     * @param array<int, array{x: float, y: float, fontSize: float, text: string, isOrderedListItem?: bool}> $entries
+     * @param array<int, array{page: int, x: float, y: float, fontSize: float, text: string, isOrderedListItem?: bool}> $entries
      * @return array<int, array{tier: int, isOrderedListItem: bool, text: string}>
      */
     private function groupIntoBlocks(array $entries, float $baseline): array
@@ -150,11 +172,17 @@ final class PdfReader implements ReaderInterface
         foreach ($entries as $entry) {
             $tier = $this->tierFor($entry['fontSize'], $baseline);
             $isListItem = $entry['isOrderedListItem'] ?? false;
+            // A list item is always its own block regardless of gap (handled
+            // by $isListItem above) - but its OWN continuation runs (a
+            // wrapped second line, or a second same-line run from inline
+            // formatting) must NOT also force a break just because the
+            // block-in-progress happens to be a list item; that would
+            // fragment and truncate the item's own text.
             $isNewBlock = $current === null
                 || $tier !== $current['tier']
                 || $isListItem
-                || $current['isOrderedListItem']
-                || ($previous !== null && ($previous['y'] - $entry['y']) > 1.5 * $entry['fontSize']);
+                || $previous['page'] !== $entry['page']
+                || ($previous['y'] - $entry['y']) > 1.5 * $entry['fontSize'];
 
             if ($isNewBlock) {
                 if ($current !== null) {
@@ -166,7 +194,12 @@ final class PdfReader implements ReaderInterface
                     'text' => $entry['text'],
                 ];
             } else {
-                $current['text'] .= ' '.$entry['text'];
+                // Runs on the same physical line (e.g. split by inline
+                // formatting) already carry any needed spacing in their own
+                // text; only a genuine new line (a wrapped continuation)
+                // needs a space inserted at the join.
+                $sameLine = abs($previous['y'] - $entry['y']) < 0.01;
+                $current['text'] .= ($sameLine ? '' : ' ').$entry['text'];
             }
 
             $previous = $entry;
@@ -180,8 +213,8 @@ final class PdfReader implements ReaderInterface
     }
 
     /**
-     * @param array<int, array{x: float, y: float, fontSize: float, text: string}> $entries
-     * @return array<int, array{x: float, y: float, fontSize: float, text: string, isOrderedListItem: bool}>
+     * @param array<int, array{page: int, x: float, y: float, fontSize: float, text: string}> $entries
+     * @return array<int, array{page: int, x: float, y: float, fontSize: float, text: string, isOrderedListItem: bool}>
      */
     private function mergeOrderedListMarkers(array $entries): array
     {
@@ -193,6 +226,7 @@ final class PdfReader implements ReaderInterface
             $next = $entries[$i + 1] ?? null;
 
             $isMarker = $next !== null
+                && $entry['page'] === $next['page']
                 && abs($entry['y'] - $next['y']) < 0.01
                 && $entry['x'] < $next['x']
                 && preg_match('/^\d+[.)]$/', trim($entry['text'])) === 1;
