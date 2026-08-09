@@ -18,18 +18,31 @@ final class PdfReaderIntegrationTest extends TestCase
         $pdf = (new PdfWriter())->write($original);
 
         $recovered = (new PdfReader())->read($pdf);
+        $content = $recovered->content();
 
-        // Structure survives: the fixture's paragraphs come back as paragraphs.
-        self::assertNotEmpty($recovered->content());
-        foreach ($recovered->content() as $block) {
+        // Structure survives, with the exact recovered text pinned so a
+        // paragraph-boundary regression (e.g. two entries silently merging)
+        // is caught, not just "some Paragraphs exist somewhere."
+        self::assertCount(7, $content);
+        $expectedText = [
+            '1. Definitions',
+            '2. Term of Agreement',
+            '2.1. Initial Term',
+            '2.2. Renewal',
+            '2.2.1. Automatic renewal',
+            '2.2.1.1. Written notice',
+            '3. Termination',
+        ];
+        foreach ($content as $index => $block) {
             self::assertInstanceOf(Paragraph::class, $block);
+            self::assertSame($expectedText[$index], $block->inlines()[0]->content());
         }
 
         // Numbering does NOT survive - confirmed loss, not a TODO. Every
         // recovered paragraph's numbering() must be null; the original
         // fixture's numeric labels ("1.", "2.1.", etc.) appear only as
         // plain leading text within the paragraph content, if at all.
-        foreach ($recovered->content() as $block) {
+        foreach ($content as $block) {
             self::assertNull($block->numbering());
         }
     }

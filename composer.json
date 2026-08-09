@@ -1,6 +1,6 @@
 {
     "name": "fissible/transmark-pdf",
-    "description": "PDF export for fissible/transmark: PdfWriter composes HtmlWriter output with dompdf/dompdf.",
+    "description": "PDF import/export for fissible/transmark: PdfWriter composes HtmlWriter output with dompdf/dompdf; PdfReader recovers a Document from PDF bytes via layout heuristics.",
     "type": "library",
     "license": "MIT",
     "keywords": ["docx", "pdf", "converter", "transmark", "dompdf"],
