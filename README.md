@@ -22,16 +22,30 @@ composer require fissible/transmark-pdf
 ```php
 use Fissible\Transmark\Pdf\PdfWriter;
 use Fissible\Transmark\Readers\DocxReader;
+use Fissible\Transmark\Pdf\PdfReader;
 
 $docxBytes = file_get_contents('agreement.docx');
 $document = (new DocxReader())->read($docxBytes);
 
 $pdfBytes = (new PdfWriter())->write($document);
+$recovered = (new PdfReader())->read($pdfBytes);
 
 file_put_contents('agreement.pdf', $pdfBytes);
 ```
 
 `PdfWriter` implements `Fissible\Transmark\Contracts\WriterInterface`, the same contract `HtmlWriter`, `DocxWriter`, and `MarkdownWriter` implement — it's a drop-in alongside any other `transmark` writer.
+
+### PDF → Document reader
+
+`PdfReader` is a best-effort PDF reader that recovers a canonical `Document` from PDF bytes using layout heuristics.
+
+Limitations to treat as accepted by design:
+- Headings and paragraph boundaries are inferred from font-size and spacing, not guaranteed
+  from semantic document structure.
+- Inline emphasis/bold and table reconstruction are not recovered.
+- Unordered lists are currently returned as plain paragraph text runs (a follow-on limitation of
+  `smalot/pdfparser`'s text-run model in the real PDFs we validated against).
+- Legal-outline `NumberingRef` structures do not round-trip through PDF text extraction.
 
 ### Paper size and orientation
 
