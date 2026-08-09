@@ -16,6 +16,7 @@ final class PdfWriter implements WriterInterface
         private readonly HtmlWriter $htmlWriter = new HtmlWriter(),
         private readonly string $paperSize = 'letter',
         private readonly string $paperOrientation = 'portrait',
+        private readonly ?Options $options = null,
     ) {
     }
 
@@ -23,11 +24,17 @@ final class PdfWriter implements WriterInterface
     {
         $html = $this->htmlWriter->write($document);
 
-        $options = new Options();
-        $options->set('isHtml5ParserEnabled', true);
+        $options = $this->options ?? new Options();
+
+        // Preserve caller intent for remote loading; leave explicit opt-in intact.
+        if (! $options->isRemoteEnabled()) {
+            $options->set('isRemoteEnabled', false);
+        }
+        $options->set('isJavascriptEnabled', false);
+        $options->set('isPhpEnabled', false);
+
         // Disallow remote resource fetches (SSRF hardening): PdfWriter's
         // input is a converted Document, not trusted arbitrary HTML.
-        $options->set('isRemoteEnabled', false);
 
         $dompdf = new Dompdf($options);
         $dompdf->loadHtml($html);

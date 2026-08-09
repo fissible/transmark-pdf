@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fissible\Transmark\Pdf\Tests;
 
+use Dompdf\Options;
 use Fissible\Transmark\Contracts\WriterInterface;
 use Fissible\Transmark\Document;
 use Fissible\Transmark\Nodes\Block\Paragraph;
@@ -36,5 +37,23 @@ final class PdfWriterTest extends TestCase
         $pdf = (new PdfWriter())->write(new Document([]));
 
         self::assertStringStartsWith('%PDF-', $pdf);
+    }
+
+    public function test_writes_with_custom_dompdf_options(): void
+    {
+        $options = new Options();
+        $options->set('isRemoteEnabled', true);
+        $options->set('isJavascriptEnabled', true);
+        $options->set('isPhpEnabled', true);
+
+        $pdf = (new PdfWriter(options: $options))->write(new Document([
+            new Paragraph([new Text('Custom options check')]),
+        ]));
+
+        self::assertTrue($options->isRemoteEnabled());
+        self::assertFalse($options->isJavascriptEnabled());
+        self::assertFalse($options->isPhpEnabled());
+        self::assertStringStartsWith('%PDF-', $pdf);
+        self::assertStringContainsString('%%EOF', $pdf);
     }
 }
