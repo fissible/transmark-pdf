@@ -35,6 +35,6 @@ jobs:
       - name: Test
         run: vendor/bin/phpunit
 
-      - name: Check code style
+      - name: Check code style (PHP 8.2)
         if: matrix.php == '8.2'
         run: vendor/bin/php-cs-fixer fix --dry-run --diff
