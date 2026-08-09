@@ -9,7 +9,7 @@ PDF export for [fissible/transmark](https://github.com/fissible/transmark): `Pdf
 ## Requirements
 
 - PHP ^8.2
-- ext-dom, ext-mbstring
+- ext-dom, ext-mbstring, ext-zip
 
 ## Installation
 
@@ -31,6 +31,17 @@ $pdfBytes = (new PdfWriter())->write($document);
 $recovered = (new PdfReader())->read($pdfBytes);
 
 file_put_contents('agreement.pdf', $pdfBytes);
+```
+
+Pass custom dompdf options when needed:
+
+```php
+use Dompdf\Options;
+
+$options = new Options();
+$options->set('defaultFont', 'Helvetica');
+
+$pdfBytes = (new PdfWriter(options: $options))->write($document);
 ```
 
 `PdfWriter` implements `Fissible\Transmark\Contracts\WriterInterface`, the same contract `HtmlWriter`, `DocxWriter`, and `MarkdownWriter` implement — it's a drop-in alongside any other `transmark` writer.
@@ -58,6 +69,12 @@ Accepts any paper size/orientation string [dompdf's `setPaper()`](https://github
 > **Note:** `PdfWriter` does not validate `paperSize`/`paperOrientation`. An invalid value
 > (e.g. `paperSize: 'not-a-size'`) does not throw — dompdf silently falls back to
 > letter/portrait. Pass values dompdf recognizes.
+
+### Runtime note
+
+`PdfWriter` relies on dompdf's font cache under `vendor/dompdf/dompdf/lib/fonts/` on first
+render for some font metadata. If that directory is read-only, rendering may trigger runtime
+errors or slower fallback behavior.
 
 ## License
 
